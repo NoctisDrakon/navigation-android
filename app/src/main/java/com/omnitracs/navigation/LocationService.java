@@ -110,7 +110,7 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
         if (placesList.size() == 0) {
             //no data found
             if (NavigationApplication.DEBUG) {
-                Log.d(TAG, "onLocationChanged: No data found");
+                Log.d(TAG, "onLocationChanged: No data stored found");
             }
             return;
         }

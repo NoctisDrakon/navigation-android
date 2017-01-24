@@ -1,6 +1,5 @@
 package com.omnitracs.navigation;
 
-import android.app.Application;
 import android.location.Location;
 
 import com.orm.SugarApp;
