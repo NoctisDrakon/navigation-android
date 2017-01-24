@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Navigation</string>
+
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+
+    <string name="action_settings">Settings</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="google_android_map_api_key" translatable="false">AIzaSyChK0J_pESyTDIYiW6VgSYTxutT6Vh1Qds</string>
+    <string name="location_needed">Sorry, this permission is needed to use the app</string>
+    <string name="search_tag">Search places</string>
+    <string name="title_activity_places">PlacesActivity</string>
+    <string name="enter_name_tag">Place to search</string>
+</resources>
