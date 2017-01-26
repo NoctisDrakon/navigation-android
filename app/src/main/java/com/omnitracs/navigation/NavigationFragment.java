@@ -51,11 +51,11 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
     private MapView mapView;
     private GoogleMap map;
     private Marker desiredPlace;
-    private boolean firstTime = true;
     private TextView distance;
     private TextView textData;
     private Location currentLocation;
     private Button searchButton;
+    private Toast infoToast;
 
     public NavigationFragment() {
         // Required empty public constructor
@@ -193,6 +193,15 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
 
                 LatLngBounds bounds = builder.build();
 
+                try {
+                    showToast(getSimpleDistanceString(NavigationApplication.globalLocation, markerLocation));
+                } catch (Exception e) {
+                    //might be null
+                    if (NavigationApplication.DEBUG) {
+                        e.printStackTrace();
+                    }
+                }
+
                 CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, 180);
                 map.animateCamera(cu);
 
@@ -298,6 +307,34 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
         super.onStop();
     }
 
+    private void showUIinfo(Location loc, String mDistance, String unity) {
+
+        //first info frame
+        String data = "My coordinates: " + loc.getLatitude() + " , " + loc.getLongitude();
+        textData.setVisibility(View.VISIBLE);
+        textData.setText(data);
+
+        //second info frame
+        distance.setVisibility(View.VISIBLE);
+        distance.setText("Estás a " + mDistance + " " + unity + " de tu destino");
+
+        if (Float.parseFloat(mDistance) < 100) {
+            distance.setBackgroundColor(ContextCompat.getColor(getActivity(), android.R.color.holo_red_light));
+        } else {
+            distance.setBackgroundColor(ContextCompat.getColor(getActivity(), android.R.color.holo_blue_dark));
+        }
+
+    }
+
+    void showToast(String text) {
+        if (infoToast != null) {
+            infoToast.cancel();
+        }
+        infoToast = Toast.makeText(getActivity(), text, Toast.LENGTH_SHORT);
+        infoToast.show();
+
+    }
+
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onServiceStopped(LocationService.ServiceStopped stopped) {
         if (stopped.stopped) {
@@ -308,60 +345,24 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onLocationEvent(LocationService.LocationEvent event) {
-        if (firstTime) {
-            setCameraSimpleToLocation(event.location);
-            firstTime = false;
-        }
+
 
         if (NavigationApplication.DEBUG) {
             Log.d(TAG, "onLocationEvent: Location catched in fragment!");
             Log.d(TAG, "onLocationChanged: Location changed: " + event.location.getLatitude() + " " + event.location.getLongitude());
         }
 
+        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+        builder.include(desiredPlace.getPosition());
+        if (currentLocation != null) {
+            builder.include(new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude()));
+        }
+        CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(builder.build(), 180);
+        map.animateCamera(cu);
+
+
         currentLocation = event.location;
-
-        if (desiredPlace != null) {
-            Location imHere = event.location;
-            Location wannaGo = new Location(LocationManager.GPS_PROVIDER);
-            wannaGo.setLatitude(desiredPlace.getPosition().latitude);
-            wannaGo.setLongitude(desiredPlace.getPosition().longitude);
-
-            float dist = getDistance(imHere, wannaGo);
-
-            float showDist = dist > 999.9 ? dist / 1000 : dist;
-            String unity = dist > 999.9 ? "kilómetros" : "metros";
-
-
-            if (NavigationApplication.DEBUG) {
-                Log.d(TAG, "onLocationEvent: Distance is: " + dist);
-            }
-
-            distance.setVisibility(View.VISIBLE);
-            distance.setText("Estás a " + showDist + " " + unity + " de tu destino");
-
-            if (dist < 100) {
-                distance.setBackgroundColor(ContextCompat.getColor(getActivity(), android.R.color.holo_red_light));
-            } else {
-                distance.setBackgroundColor(ContextCompat.getColor(getActivity(), android.R.color.holo_blue_dark));
-            }
-
-        }
-    }
-
-    public float getDistance(Location loc1, Location loc2) {
-
-        if (NavigationApplication.DEBUG) {
-            Log.d(TAG, "getDistance: calculations! ");
-        }
-
-        String data = "My coordinates: " + loc1.getLatitude() + " , " + loc1.getLongitude() + " \n Place coordinates: " + loc2.getLatitude() + " , " + loc2.getLongitude();
-
-        textData.setVisibility(View.VISIBLE);
-        textData.setText(data);
-
-        float distanceInMeters = loc1.distanceTo(loc2);
-
-        return distanceInMeters;
+        showUIinfo(event.location, event.distance, event.unity);
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -384,6 +385,18 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
 
         currentLocation = lastLocationReceived.location;
         setCameraSimpleToLocation(lastLocationReceived.location);
+    }
+
+    private String getSimpleDistanceString(Location l1, Location l2) {
+        float rawDistance = l1.distanceTo(l2);
+        float kmOrMtsDistance = rawDistance > 999.9 ? rawDistance / 1000 : rawDistance;
+        String unity = rawDistance > 999.9 ? "kilómetros" : "metros";
+        String formattedOutput = String.format(rawDistance > 999.9 ? "%.1f" : "%.0f", kmOrMtsDistance);
+        return formattedOutput + " " + unity;
+    }
+
+    private float getRawDistance(Location l1, Location l2) {
+        return l1.distanceTo(l2);
     }
 
 

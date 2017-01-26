@@ -2,4 +2,5 @@
 <resources>
     <string name="search_tag">Search places</string>
     <string name="enter_name_tag">Place to search</string>
+    <string name="no_selected_place">You have no selected a place yet, please click anywhere on the map to place a marker.</string>
 </resources>

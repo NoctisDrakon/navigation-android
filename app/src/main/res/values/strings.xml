@@ -13,4 +13,8 @@
     <string name="search_tag">Search places</string>
     <string name="title_activity_places">PlacesActivity</string>
     <string name="enter_name_tag">Place to search</string>
+    <string name="required_permission_title">Permission required</string>
+    <string name="required_permission_explanation">Functionality of this application depends completely on location permissions. Not having them makes it useless and pointless, please try it again and grant location permissions when prompted.</string>
+    <string name="near_to_place_prompt">Current distance to specified location is less than 100 mts. You don\'t need this right now, please select a farther location.</string>
+    <string name="no_selected_place">You have no selected a place yet, please click anywhere on the map to place a marker.</string>
 </resources>

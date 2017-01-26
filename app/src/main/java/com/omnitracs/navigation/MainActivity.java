@@ -4,9 +4,12 @@ import android.*;
 import android.Manifest;
 import android.app.ActivityManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -15,6 +18,7 @@ import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.content.ContextCompat;
+import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.View;
 import android.support.design.widget.NavigationView;
@@ -29,13 +33,12 @@ import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.LocationListener;
-import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
 import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements
         NavigationView.OnNavigationItemSelectedListener,
@@ -46,6 +49,7 @@ public class MainActivity extends AppCompatActivity implements
     private static final int LOCATION_PERMISSION = 332;
     private int mSelectedItem;
     private GoogleApiClient client;
+    private Toast infoToast;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,7 +58,23 @@ public class MainActivity extends AppCompatActivity implements
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+        if (NavigationApplication.DEBUG) {
+            Log.d(TAG, "onCreate: Extra in intent: " + getIntent().getBooleanExtra("nuke", false));
+        }
+
+        if (getIntent().getBooleanExtra("nuke", false)) {
+            stopService(new Intent(getApplicationContext(), LocationService.class));
+            Toast.makeText(MainActivity.this, "El servicio se ha detenido", Toast.LENGTH_SHORT).show();
+        }
+
+        final FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+
+        if (isMyServiceRunning(LocationService.class)) {
+            fab.setImageDrawable(ContextCompat.getDrawable(this, android.R.drawable.ic_media_pause));
+        } else {
+            fab.setImageDrawable(ContextCompat.getDrawable(this, android.R.drawable.ic_media_play));
+        }
+
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -62,9 +82,46 @@ public class MainActivity extends AppCompatActivity implements
                 if (isMyServiceRunning(LocationService.class)) {
                     stopService(new Intent(getApplicationContext(), LocationService.class));
                     Toast.makeText(MainActivity.this, "El servicio se ha detenido", Toast.LENGTH_SHORT).show();
+                    fab.setImageDrawable(ContextCompat.getDrawable(getApplicationContext(), android.R.drawable.ic_media_play));
                 } else {
+
+
+                    List<Place> placesList = new ArrayList<>();
+
+                    try {
+                        placesList = Place.listAll(Place.class);
+                    } catch (Exception e) {
+                        if (NavigationApplication.DEBUG) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    if (placesList.size() == 0) {
+                        showToast(getString(R.string.no_selected_place));
+                        return;
+                    } else {
+                        //get place and check current distance
+                        Place p = placesList.get(0);
+
+                        Location placeLocation = new Location(LocationManager.GPS_PROVIDER);
+                        placeLocation.setLatitude(p.lat);
+                        placeLocation.setLongitude(p.lng);
+
+                        try {
+                            if (NavigationApplication.globalLocation.distanceTo(placeLocation) < 100) {
+                                showToast(getString(R.string.near_to_place_prompt));
+                                return;
+                            }
+                        } catch (Exception ex) {
+                            startService(new Intent(getApplicationContext(), LocationService.class));
+                            Toast.makeText(MainActivity.this, "El servicio se ha iniciado", Toast.LENGTH_SHORT).show();
+                            fab.setImageDrawable(ContextCompat.getDrawable(getApplicationContext(), android.R.drawable.ic_media_pause));
+                        }
+                    }
+
                     startService(new Intent(getApplicationContext(), LocationService.class));
                     Toast.makeText(MainActivity.this, "El servicio se ha iniciado", Toast.LENGTH_SHORT).show();
+                    fab.setImageDrawable(ContextCompat.getDrawable(getApplicationContext(), android.R.drawable.ic_media_pause));
                 }
 
             }
@@ -280,6 +337,27 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
+    private void promtToClose() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this)
+                .setTitle(getString(R.string.required_permission_title))
+                .setMessage(getString(R.string.required_permission_explanation))
+                .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        finish();
+                    }
+                })
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                    @Override
+                    public void onCancel(DialogInterface dialog) {
+                        finish();
+                    }
+                });
+        builder.show();
+
+
+    }
+
     @Override
     public void onConnectionSuspended(int i) {
 
@@ -296,16 +374,16 @@ public class MainActivity extends AppCompatActivity implements
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         switch (requestCode) {
-            case LOCATION_PERMISSION: {
+            case LOCATION_PERMISSION:
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    //we got the permission
                     getLastLocation();
                 } else {
-                    //dang, we don't have it. Prompt to close application
+                    promtToClose();
                 }
-                return;
-            }
+
+                break;
         }
+
 
     }
 
@@ -324,6 +402,15 @@ public class MainActivity extends AppCompatActivity implements
         public LastLocationReceived(Location location) {
             this.location = location;
         }
+
+    }
+
+    void showToast(String text) {
+        if (infoToast != null) {
+            infoToast.cancel();
+        }
+        infoToast = Toast.makeText(this, text, Toast.LENGTH_LONG);
+        infoToast.show();
 
     }
 }

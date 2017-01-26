@@ -1,13 +1,24 @@
 package com.omnitracs.navigation;
 
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.location.Location;
 import android.location.LocationManager;
+import android.media.AudioManager;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Vibrator;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.v4.app.NotificationCompat;
+import android.support.v4.app.NotificationManagerCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.View;
@@ -29,10 +40,18 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
         LocationListener {
 
     private static final String TAG = "LocationService";
+    private static final int NOTIFICATION_ID = 3323342;
+    private static final long[] pattern = {100, 200, 100, 200, 100, 200, 100, 200, 100, 100, 100, 100, 100, 200, 100, 200, 100, 200, 100, 200, 100, 100, 100, 100, 100, 200, 100, 200, 100, 200, 100, 200, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 50, 50, 100, 800};
+
     private GoogleApiClient client;
     private LocationRequest mLocationRequest;
     private Location currentLocation;
     private Toast infoToast;
+    private NotificationCompat.Builder mBuilder;
+    private boolean vibrating = false;
+    private boolean actionAdded = false;
+    private Ringtone r;
+    private Vibrator v;
 
     public LocationService() {
     }
@@ -53,6 +72,10 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
                 .addOnConnectionFailedListener(this)
                 .build();
         client.connect();
+
+        r = RingtoneManager.getRingtone(getApplicationContext(), RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE));
+        v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        showNotification();
 
         return START_STICKY;
     }
@@ -78,6 +101,8 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
         }
 
         EventBus.getDefault().post(new ServiceStopped(true));
+        cancelNotification(this, NOTIFICATION_ID);
+        nukeAlarm();
 
 
         super.onDestroy();
@@ -95,7 +120,6 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
         }
         currentLocation = location;
         NavigationApplication.globalLocation = location;
-        EventBus.getDefault().post(new LocationEvent(location));
 
         List<Place> placesList = new ArrayList<>();
 
@@ -123,21 +147,23 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
             Location imHere = currentLocation;
             Location wannaGo = desiredPlace;
 
-            float dist = getDistance(imHere, wannaGo);
+            float dist = getDistance(imHere, wannaGo); //distance in meters
 
+            /*quick operations to show understandable info to user*/
             float showDist = dist > 999.9 ? dist / 1000 : dist;
             String unity = dist > 999.9 ? "kilómetros" : "metros";
-
+            String formattedOutput = String.format(dist > 999.9 ? "%.1f" : "%.0f", showDist);
 
             if (NavigationApplication.DEBUG) {
                 Log.d(TAG, "onLocationEvent: Distance is: " + dist);
             }
 
-            showToast("Estás a " + showDist + " " + unity + " de tu destino");
+            if (dist < 100) {
+                playAlarm();
+            }
 
-
-            //post here an event to fragment
-
+            EventBus.getDefault().post(new LocationEvent(location, formattedOutput, unity));
+            updateNotification(formattedOutput + " " + unity, dist < 100);
         }
     }
 
@@ -194,9 +220,13 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
     public class LocationEvent {
 
         public final Location location;
+        public final String distance;
+        public final String unity;
 
-        public LocationEvent(Location location) {
+        public LocationEvent(Location location, String distance, String unity) {
             this.location = location;
+            this.distance = distance;
+            this.unity = unity;
         }
     }
 
@@ -216,6 +246,72 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
         infoToast = Toast.makeText(this, text, Toast.LENGTH_LONG);
         infoToast.show();
 
+    }
+
+    private void showNotification() {
+
+        Intent resultIntent = new Intent(this, MainActivity.class);
+
+        PendingIntent resultPendingIntent = PendingIntent.getActivity(this, 0, resultIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+        mBuilder =
+                new NotificationCompat.Builder(this)
+                        .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                        .setContentTitle("Servicio de rastreo en ejecución")
+                        .setContentText("Calculando distancia...")
+                        .setContentIntent(resultPendingIntent)
+                        .setOngoing(true);
+
+        NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, mBuilder.build());
+
+    }
+
+    private void updateNotification(String distance, boolean isNear) {
+        mBuilder.setContentText("Estás a " + distance + " de tu destino");
+
+        if (isNear && !actionAdded) {
+            Intent intent = new Intent(this, MainActivity.class).putExtra("nuke", true);
+            PendingIntent dismissIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+            mBuilder.addAction(new NotificationCompat.Action(android.R.drawable.stat_notify_call_mute, "Desactivar", dismissIntent));
+            actionAdded = true;
+        }
+
+        NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, mBuilder.build());
+    }
+
+    private void cancelNotification(Context ctx, int notifyId) {
+        String ns = Context.NOTIFICATION_SERVICE;
+        NotificationManager nMgr = (NotificationManager) ctx.getSystemService(ns);
+        nMgr.cancel(notifyId);
+    }
+
+    private void playAlarm() {
+        if (!r.isPlaying()) {
+            //if (!NavigationApplication.DEBUG) { // for debugging purposes, please don't be that loud.
+                AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+                am.setStreamVolume(AudioManager.STREAM_RING, am.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0);
+            //}
+            r.play();
+        }
+
+
+        if (!vibrating) {
+            v.vibrate(pattern, -1);
+            vibrating = true;
+        }
+
+
+    }
+
+    private void nukeAlarm() {
+        if (r.isPlaying()) {
+            r.stop();
+        }
+
+        if (vibrating) {
+            v.cancel();
+            vibrating = false;
+        }
     }
 
 }

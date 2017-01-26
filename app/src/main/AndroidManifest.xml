@@ -12,6 +12,7 @@
         android:protectionLevel="signature" />
 
     <uses-permission android:name="com.omnitracs.navigation.permission.MAPS_RECEIVE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:name=".NavigationApplication"
