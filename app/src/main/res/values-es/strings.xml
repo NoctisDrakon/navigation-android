@@ -3,4 +3,8 @@
     <string name="search_tag">Search places</string>
     <string name="enter_name_tag">Place to search</string>
     <string name="no_selected_place">You have no selected a place yet, please click anywhere on the map to place a marker.</string>
+    <string name="search_hint">Enter a place to search</string>
+    <string name="no_results">No results</string>
+    <string name="offline_tag">(Offline mode)</string>
+    <string name="offline_toast">Offline mode, address will not be saved nor shown in the marker</string>
 </resources>

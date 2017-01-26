@@ -2,6 +2,7 @@ package com.omnitracs.navigation;
 
 import android.*;
 import android.Manifest;
+import android.app.Activity;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -19,6 +20,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
+import android.text.Html;
 import android.util.Log;
 import android.view.View;
 import android.support.design.widget.NavigationView;
@@ -32,8 +34,11 @@ import android.view.MenuItem;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.ui.PlacePicker;
 
 import org.greenrobot.eventbus.EventBus;
 
@@ -47,6 +52,7 @@ public class MainActivity extends AppCompatActivity implements
 
     private static final String TAG = "MainActivity";
     private static final int LOCATION_PERMISSION = 332;
+    private static final int PLACES_REQUEST = 323;
     private int mSelectedItem;
     private GoogleApiClient client;
     private Toast infoToast;
@@ -188,13 +194,29 @@ public class MainActivity extends AppCompatActivity implements
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
         // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
+        if (id == R.id.action_search) {
+            //startActivityForResult(new Intent(this, SearchPlacesActivity.class), PLACES_REQUEST);
+
+            // Construct an intent for the place picker
+            try {
+                PlacePicker.IntentBuilder intentBuilder =
+                        new PlacePicker.IntentBuilder();
+                Intent intent = intentBuilder.build(this);
+                // Start the intent by requesting a result,
+                // identified by a request code.
+                startActivityForResult(intent, PLACES_REQUEST);
+
+            } catch (GooglePlayServicesRepairableException e) {
+                // ...
+            } catch (GooglePlayServicesNotAvailableException e) {
+                // ...
+            }
+
+
             return true;
         }
 
@@ -213,6 +235,19 @@ public class MainActivity extends AppCompatActivity implements
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+
+        if (requestCode == PLACES_REQUEST && resultCode == Activity.RESULT_OK) {
+
+            final com.google.android.gms.location.places.Place place = PlacePicker.getPlace(this, data);
+            EventBus.getDefault().post(new PlaceReceived(new Place(place.getName().toString(), place.getLatLng().latitude, place.getLatLng().longitude)));
+
+        } else {
+            super.onActivityResult(requestCode, resultCode, data);
+        }
     }
 
     /*@Override
@@ -402,6 +437,16 @@ public class MainActivity extends AppCompatActivity implements
         public LastLocationReceived(Location location) {
             this.location = location;
         }
+
+    }
+
+    public class PlaceReceived {
+        public Place place;
+
+        public PlaceReceived(Place place) {
+            this.place = place;
+        }
+
 
     }
 

@@ -287,10 +287,11 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
 
     private void playAlarm() {
         if (!r.isPlaying()) {
-            //if (!NavigationApplication.DEBUG) { // for debugging purposes, please don't be that loud.
+            if (!NavigationApplication.DEBUG) { // for debugging purposes, please don't be that loud.
                 AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
                 am.setStreamVolume(AudioManager.STREAM_RING, am.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0);
-            //}
+
+            }
             r.play();
         }
 
