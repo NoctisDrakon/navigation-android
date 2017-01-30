@@ -151,19 +151,19 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
 
             /*quick operations to show understandable info to user*/
             float showDist = dist > 999.9 ? dist / 1000 : dist;
-            String unity = dist > 999.9 ? "kilómetros" : "metros";
+            String unity = dist > 999.9 ? "Km." : "Mts.";
             String formattedOutput = String.format(dist > 999.9 ? "%.1f" : "%.0f", showDist);
 
             if (NavigationApplication.DEBUG) {
                 Log.d(TAG, "onLocationEvent: Distance is: " + dist);
             }
 
-            if (dist < 100) {
+            if (dist < Utils.getAlarmDistance(this)) {
                 playAlarm();
             }
 
-            EventBus.getDefault().post(new LocationEvent(location, formattedOutput, unity));
-            updateNotification(formattedOutput + " " + unity, dist < 100);
+            EventBus.getDefault().post(new LocationEvent(location, formattedOutput, unity, dist));
+            updateNotification(formattedOutput + " " + unity, dist < Utils.getAlarmDistance(this));
         }
     }
 
@@ -222,11 +222,13 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
         public final Location location;
         public final String distance;
         public final String unity;
+        public final float rawDistance;
 
-        public LocationEvent(Location location, String distance, String unity) {
+        public LocationEvent(Location location, String distance, String unity, float rawDistance) {
             this.location = location;
             this.distance = distance;
             this.unity = unity;
+            this.rawDistance = rawDistance;
         }
     }
 
@@ -267,7 +269,7 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
     }
 
     private void updateNotification(String distance, boolean isNear) {
-        mBuilder.setContentText("Estás a " + distance + " de tu destino");
+        mBuilder.setContentText(String.format(getString(R.string.distance_format), distance));
 
         if (isNear && !actionAdded) {
             Intent intent = new Intent(this, MainActivity.class).putExtra("nuke", true);
@@ -287,18 +289,15 @@ public class LocationService extends Service implements GoogleApiClient.Connecti
 
     private void playAlarm() {
         if (!r.isPlaying()) {
-            if (!NavigationApplication.DEBUG) { // for debugging purposes, please don't be that loud.
-                AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-                am.setStreamVolume(AudioManager.STREAM_RING, am.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0);
-
-            }
+            AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            am.setStreamVolume(AudioManager.STREAM_RING, am.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0);
             r.play();
         }
 
 
         if (!vibrating) {
-            v.vibrate(pattern, -1);
             vibrating = true;
+            v.vibrate(pattern, -1);
         }
 
 

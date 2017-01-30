@@ -10,18 +10,18 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
-import android.os.Build;
 import android.os.Bundle;
+import android.support.annotation.IntegerRes;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
-import android.text.Html;
+import android.text.TextUtils;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
@@ -31,6 +31,10 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -84,7 +88,7 @@ public class MainActivity extends AppCompatActivity implements
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
+                supportInvalidateOptionsMenu();
                 if (isMyServiceRunning(LocationService.class)) {
                     stopService(new Intent(getApplicationContext(), LocationService.class));
                     Toast.makeText(MainActivity.this, "El servicio se ha detenido", Toast.LENGTH_SHORT).show();
@@ -114,9 +118,12 @@ public class MainActivity extends AppCompatActivity implements
                         placeLocation.setLongitude(p.lng);
 
                         try {
-                            if (NavigationApplication.globalLocation.distanceTo(placeLocation) < 100) {
+                            if (NavigationApplication.globalLocation.distanceTo(placeLocation) < Utils.getAlarmDistance(getApplicationContext())) {
                                 showToast(getString(R.string.near_to_place_prompt));
                                 return;
+                            } else {
+                                //SET CURRENT DISTANCE HERE!!!!!
+                                Utils.setDistance(getApplicationContext(), placeLocation.distanceTo(NavigationApplication.globalLocation));
                             }
                         } catch (Exception ex) {
                             startService(new Intent(getApplicationContext(), LocationService.class));
@@ -129,6 +136,7 @@ public class MainActivity extends AppCompatActivity implements
                     Toast.makeText(MainActivity.this, "El servicio se ha iniciado", Toast.LENGTH_SHORT).show();
                     fab.setImageDrawable(ContextCompat.getDrawable(getApplicationContext(), android.R.drawable.ic_media_pause));
                 }
+                supportInvalidateOptionsMenu();
 
             }
         });
@@ -166,12 +174,6 @@ public class MainActivity extends AppCompatActivity implements
 
     @Override
     protected void onStop() {
-        //LocationServices.FusedLocationApi.removeLocationUpdates(client, this);
-
-        // only stop if it's connected, otherwise we crash
-        /*if (client != null) {
-            client.disconnect();
-        }*/
         super.onStop();
     }
 
@@ -193,31 +195,48 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        if (isMyServiceRunning(LocationService.class)) {
+            menu.getItem(1).setEnabled(false);
+            // menu.findItem(R.id.example_foobar).setEnabled(false);
+        } else {
+            menu.getItem(1).setEnabled(true);
+        }
+        return true;
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_search) {
-            //startActivityForResult(new Intent(this, SearchPlacesActivity.class), PLACES_REQUEST);
 
-            // Construct an intent for the place picker
-            try {
-                PlacePicker.IntentBuilder intentBuilder =
-                        new PlacePicker.IntentBuilder();
-                Intent intent = intentBuilder.build(this);
-                // Start the intent by requesting a result,
-                // identified by a request code.
-                startActivityForResult(intent, PLACES_REQUEST);
+            if (isMyServiceRunning(LocationService.class)) {
+                Toast.makeText(this, getString(R.string.cannot_modify_place), Toast.LENGTH_SHORT).show();
+            } else {
 
-            } catch (GooglePlayServicesRepairableException e) {
-                // ...
-            } catch (GooglePlayServicesNotAvailableException e) {
-                // ...
+                try {
+                    PlacePicker.IntentBuilder intentBuilder = new PlacePicker.IntentBuilder();
+                    Intent intent = intentBuilder.build(this);
+                    startActivityForResult(intent, PLACES_REQUEST);
+
+                } catch (GooglePlayServicesRepairableException e) {
+                    if (NavigationApplication.DEBUG) {
+                        e.printStackTrace();
+                    }
+                } catch (GooglePlayServicesNotAvailableException e) {
+                    if (NavigationApplication.DEBUG) {
+                        e.printStackTrace();
+                    }
+                }
             }
 
 
             return true;
+        } else if (id == R.id.action_distance) {
+            createDistancePopUp();
         }
 
         return super.onOptionsItemSelected(item);
@@ -249,79 +268,6 @@ public class MainActivity extends AppCompatActivity implements
             super.onActivityResult(requestCode, resultCode, data);
         }
     }
-
-    /*@Override
-    public void onConnected(@Nullable Bundle bundle) {
-        setLocationUpdates();
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {
-
-    }
-
-
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-
-    }*/
-
-   /* public void setLocationUpdates() {
-
-        if (NavigationApplication.DEBUG) {
-            Log.d(TAG, "setLocationUpdates: Setting location updates");
-        }
-
-        try {
-            if (client == null || !client.isConnected()) {
-                if (NavigationApplication.DEBUG) {
-                    Log.d(TAG, "setLocationUpdates: Something went wrong with connection");
-                }
-                return;
-            }
-
-            //get last location first
-            NavigationApplication.globalLocation = LocationServices.FusedLocationApi.getLastLocation(client);
-
-            if (NavigationApplication.globalLocation != null) {
-                if (NavigationApplication.DEBUG) {
-                    Log.d(TAG, "setLocationUpdates: Last known location is:  " + NavigationApplication.globalLocation.getLongitude() + " <-> " + NavigationApplication.globalLocation.getLatitude());
-                }
-                EventBus.getDefault().post(new LocationEvent(NavigationApplication.globalLocation));
-            }
-
-            mLocationRequest = LocationRequest.create()
-                    .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
-                    .setInterval(2000)
-                    .setFastestInterval(1000);
-            // Request location updates
-            LocationServices.FusedLocationApi.requestLocationUpdates(client, mLocationRequest, this);
-
-        } catch (SecurityException se) {
-            if (NavigationApplication.DEBUG) {
-                se.printStackTrace();
-            }
-        }
-
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-        if (NavigationApplication.DEBUG) {
-            Log.d(TAG, "onLocationChanged: Location changed: " + location.getLatitude() + " " + location.getLongitude());
-        }
-        NavigationApplication.globalLocation = location;
-        EventBus.getDefault().post(new LocationEvent(NavigationApplication.globalLocation));
-    }
-
-    public class LocationEvent {
-
-        public final Location location;
-
-        public LocationEvent(Location location) {
-            this.location = location;
-        }
-    }*/
 
     private boolean isMyServiceRunning(Class<?> serviceClass) {
         ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
@@ -372,6 +318,105 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
+    private void createDistancePopUp() {
+        LayoutInflater inflater = this.getLayoutInflater();
+        final View v = inflater.inflate(R.layout.default_distance_layout, null);
+        final AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(v)
+                .setTitle(R.string.distance_title)
+                .setPositiveButton(android.R.string.ok, null) //Set to null. We override the onclick
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+
+        dialog.setOnShowListener(new DialogInterface.OnShowListener() {
+
+            @Override
+            public void onShow(final DialogInterface dialog) {
+
+                Button button = ((AlertDialog) dialog).getButton(AlertDialog.BUTTON_POSITIVE);
+                final RadioGroup radioDistance = (RadioGroup) v.findViewById(R.id.radio_distance);
+                RadioButton mts100 = (RadioButton) v.findViewById(R.id.radio_100);
+                RadioButton mts200 = (RadioButton) v.findViewById(R.id.radio_200);
+                RadioButton mts500 = (RadioButton) v.findViewById(R.id.radio_500);
+                RadioButton mts1000 = (RadioButton) v.findViewById(R.id.radio_1000);
+                RadioButton mtsCustom = (RadioButton) v.findViewById(R.id.radio_custom);
+                final EditText customDistance = (EditText) v.findViewById(R.id.custom_distance);
+
+                int d = Utils.getAlarmDistance(getApplicationContext());
+
+                if (d == 100) {
+                    mts100.setChecked(true);
+                } else if (d == 200) {
+                    mts200.setChecked(true);
+                } else if (d == 500) {
+                    mts500.setChecked(true);
+                } else if (d == 1000) {
+                    mts1000.setChecked(true);
+                } else {
+                    mtsCustom.setChecked(true);
+                    customDistance.setVisibility(View.VISIBLE);
+                    customDistance.setText(d + "");
+                }
+
+                radioDistance.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+                    @Override
+                    public void onCheckedChanged(RadioGroup group, int checkedId) {
+                        if (checkedId == R.id.radio_custom) {
+                            customDistance.setVisibility(View.VISIBLE);
+                        } else {
+                            customDistance.setVisibility(View.GONE);
+                        }
+                    }
+                });
+
+                button.setOnClickListener(new View.OnClickListener() {
+
+                    @Override
+                    public void onClick(View view) {
+                        switch (radioDistance.getCheckedRadioButtonId()) {
+                            case R.id.radio_100:
+                                Utils.setAlarmDistance(getApplicationContext(), 100);
+                                dialog.dismiss();
+                                break;
+                            case R.id.radio_200:
+                                Utils.setAlarmDistance(getApplicationContext(), 200);
+                                dialog.dismiss();
+                                break;
+                            case R.id.radio_500:
+                                Utils.setAlarmDistance(getApplicationContext(), 500);
+                                dialog.dismiss();
+                                break;
+                            case R.id.radio_1000:
+                                Utils.setAlarmDistance(getApplicationContext(), 1000);
+                                dialog.dismiss();
+                                break;
+                            case R.id.radio_custom:
+                                if (TextUtils.isEmpty(customDistance.getText())) {
+                                    customDistance.setError(getString(R.string.field_required));
+                                    customDistance.requestFocus();
+                                } else {
+                                    int custDistance = Integer.parseInt(customDistance.getText().toString());
+                                    if (custDistance < 100) {
+                                        customDistance.setError(getString(R.string.min_distance_alert));
+                                    } else if (custDistance > 2000) {
+                                        customDistance.setError(getString(R.string.max_distance_alert));
+                                    } else {
+                                        Utils.setAlarmDistance(getApplicationContext(), custDistance);
+                                        dialog.dismiss();
+                                    }
+                                }
+
+                                break;
+                        }
+                    }
+                });
+            }
+        });
+
+        dialog.show();
+
+    }
+
     private void promtToClose() {
         AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this)
                 .setTitle(getString(R.string.required_permission_title))
@@ -389,8 +434,6 @@ public class MainActivity extends AppCompatActivity implements
                     }
                 });
         builder.show();
-
-
     }
 
     @Override
@@ -456,6 +499,7 @@ public class MainActivity extends AppCompatActivity implements
         }
         infoToast = Toast.makeText(this, text, Toast.LENGTH_LONG);
         infoToast.show();
-
     }
+
+
 }

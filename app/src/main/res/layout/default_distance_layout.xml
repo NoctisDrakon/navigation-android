@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <RadioGroup
+        android:id="@+id/radio_distance"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="10dp">
+
+        <RadioButton
+            android:id="@+id/radio_100"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/mts_100" />
+
+        <RadioButton
+            android:id="@+id/radio_200"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/mts_200" />
+
+        <RadioButton
+            android:id="@+id/radio_500"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/mts_500" />
+
+        <RadioButton
+            android:id="@+id/radio_1000"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/mts_1000" />
+
+        <RadioButton
+            android:id="@+id/radio_custom"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/mts_custom" />
+
+    </RadioGroup>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:animateLayoutChanges="true">
+
+        <android.support.design.widget.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <EditText
+                android:id="@+id/custom_distance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/enter_distance"
+                android:inputType="number"
+                android:maxLength="4"
+                android:maxLines="1"
+                android:visibility="gone" />
+
+        </android.support.design.widget.TextInputLayout>
+    </LinearLayout>
+
+</LinearLayout>

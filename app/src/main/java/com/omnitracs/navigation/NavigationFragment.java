@@ -3,6 +3,7 @@ package com.omnitracs.navigation;
 
 
 import android.Manifest;
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -18,16 +19,20 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
+import android.support.v7.widget.CardView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.github.lzyzsd.circleprogress.DonutProgress;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -58,10 +63,12 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
     private GoogleMap map;
     private Marker desiredPlace;
     private TextView distance;
-    private TextView textData;
     private Location currentLocation;
     private Toast infoToast;
     private LinearLayout waitLayout;
+    private DonutProgress donut;
+    private CardView cardInfo;
+
 
     public NavigationFragment() {
         // Required empty public constructor
@@ -89,8 +96,9 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
         mapView = (MapView) view.findViewById(R.id.map);
         mapView.onCreate(savedInstanceState);
         distance = (TextView) view.findViewById(R.id.distance);
-        textData = (TextView) view.findViewById(R.id.text_data);
         waitLayout = (LinearLayout) view.findViewById(R.id.wait_layout);
+        donut = (DonutProgress) view.findViewById(R.id.donut_progress);
+        cardInfo = (CardView) view.findViewById(R.id.card_info);
 
         if (NavigationApplication.DEBUG) {
             Log.d(TAG, "onCreateView: Getting the map!");
@@ -156,8 +164,13 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
         googleMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
             @Override
             public void onMapLongClick(LatLng latLng) {
-                distance.setText("");
 
+                if (isMyServiceRunning(LocationService.class)) {
+                    Toast.makeText(getActivity(), getString(R.string.cannot_modify_place), Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                distance.setText("");
                 new GetAddressTask().execute(latLng.latitude, latLng.longitude);
             }
         });
@@ -279,21 +292,18 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
         super.onStop();
     }
 
-    private void showUIinfo(Location loc, String mDistance, String unity) {
-
-        //first info frame
-        String data = "My coordinates: " + loc.getLatitude() + " , " + loc.getLongitude();
-        textData.setVisibility(View.VISIBLE);
-        textData.setText(data);
+    private void showUIinfo(Location loc, String mDistance, String unity, int donutValue) {
 
         //second info frame
-        distance.setVisibility(View.VISIBLE);
-        distance.setText("Estás a " + mDistance + " " + unity + " de tu destino");
+        //cardInfo.setVisibility(View.VISIBLE);
+        if (cardInfo.getVisibility() != View.VISIBLE) setCardVisibilityOn();
+        distance.setText(String.format(getString(R.string.distance_format), mDistance + " " + unity));
+        donut.setProgress(donutValue);
 
-        if (Float.parseFloat(mDistance) < 100) {
-            distance.setBackgroundColor(ContextCompat.getColor(getActivity(), android.R.color.holo_red_light));
+        if (Float.parseFloat(mDistance) < Utils.getDistance(getActivity())) {
+            distance.setTextColor(ContextCompat.getColor(getActivity(), R.color.colorAccent));
         } else {
-            distance.setBackgroundColor(ContextCompat.getColor(getActivity(), android.R.color.holo_blue_dark));
+            distance.setTextColor(ContextCompat.getColor(getActivity(), R.color.colorPrimary));
         }
 
     }
@@ -310,19 +320,19 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onServiceStopped(LocationService.ServiceStopped stopped) {
         if (stopped.stopped) {
-            textData.setVisibility(View.GONE);
-            distance.setVisibility(View.GONE);
+            //cardInfo.setVisibility(View.GONE);
+            setCardVisibilityOff();
         }
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onLocationEvent(LocationService.LocationEvent event) {
 
-
         if (NavigationApplication.DEBUG) {
             Log.d(TAG, "onLocationEvent: Location catched in fragment!");
-            Log.d(TAG, "onLocationChanged: Location changed: " + event.location.getLatitude() + " " + event.location.getLongitude());
-            Log.d(TAG, "onLocationEvent: Distance saved: " + Utils.getDistance(getActivity()) + " Current Distance: " + Float.parseFloat(event.distance));
+            Log.d(TAG, "onLocationEvent: Location changed: " + event.location.getLatitude() + " " + event.location.getLongitude());
+            Log.d(TAG, "onLocationEvent: Distance saved: " + Utils.getDistance(getActivity()) + " Current Distance: " + event.rawDistance);
+            Log.d(TAG, "onLocationEvent: Percent: " + getProgressPercent(Utils.getDistance(getActivity()), event.rawDistance));
         }
 
         LatLngBounds.Builder builder = new LatLngBounds.Builder();
@@ -333,9 +343,8 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
         CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(builder.build(), 180);
         map.animateCamera(cu);
 
-
         currentLocation = event.location;
-        showUIinfo(event.location, event.distance, event.unity);
+        showUIinfo(event.location, event.distance, event.unity, getProgressPercent(Utils.getDistance(getActivity()), event.rawDistance));
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -402,6 +411,43 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
     private void getAddress(double lat, double lng) {
     }
 
+    private boolean isMyServiceRunning(Class<?> serviceClass) {
+        ActivityManager manager = (ActivityManager) getActivity().getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.getName().equals(service.service.getClassName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void setCardVisibilityOn() {
+        Animation animation = AnimationUtils.loadAnimation(getActivity(), R.anim.slide_down_fade_in);
+        cardInfo.setVisibility(View.VISIBLE);
+        cardInfo.startAnimation(animation);
+    }
+
+    private void setCardVisibilityOff() {
+        Animation animation = AnimationUtils.loadAnimation(getActivity(), R.anim.slide_up_fade_out);
+        animation.setAnimationListener(new Animation.AnimationListener() {
+            @Override
+            public void onAnimationStart(Animation animation) {
+
+            }
+
+            @Override
+            public void onAnimationEnd(Animation animation) {
+                cardInfo.setVisibility(View.GONE);
+            }
+
+            @Override
+            public void onAnimationRepeat(Animation animation) {
+
+            }
+        });
+        cardInfo.startAnimation(animation);
+    }
+
     private class GetAddressTask extends AsyncTask<Double, Void, Void> {
 
         Address obj;
@@ -463,11 +509,10 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
                     @Override
                     public void run() {
                         waitLayout.setVisibility(View.GONE);
-                        Toast.makeText(getActivity().getApplicationContext(), "any mesage", Toast.LENGTH_LONG).show();
+                        Toast.makeText(getActivity(), getString(R.string.offline_toast), Toast.LENGTH_SHORT).show();
+                        createMarkerWithName(getString(R.string.offline_tag), providedLat, providedLng);
                     }
                 });
-                Toast.makeText(getActivity(), getString(R.string.offline_toast), Toast.LENGTH_SHORT).show();
-                createMarkerWithName(getString(R.string.offline_tag), providedLat, providedLng);
             }
             return null;
         }
@@ -502,6 +547,10 @@ public class NavigationFragment extends Fragment implements OnMapReadyCallback {
         return l1.distanceTo(l2);
     }
 
+    private int getProgressPercent(float d1, float d2) {
+        int dist = 100 - Math.round((d2 * 100) / d1);
+        return dist < 0 ? 0 : dist;
+    }
 
 }
 

@@ -1,10 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="search_tag">Search places</string>
+    <string name="search_tag">Buscar lugares</string>
     <string name="enter_name_tag">Place to search</string>
-    <string name="no_selected_place">You have no selected a place yet, please click anywhere on the map to place a marker.</string>
+    <string name="no_selected_place">No hay ningún lugar seleccionado aún, Haz un tap largo sobre el mapa para añadir un punto.</string>
     <string name="search_hint">Enter a place to search</string>
     <string name="no_results">No results</string>
     <string name="offline_tag">(Offline mode)</string>
     <string name="offline_toast">Offline mode, address will not be saved nor shown in the marker</string>
+    <string name="cannot_modify_place">You cannot change the destiny place while the service is running.</string>
+    <string name="near_to_place_prompt">La distancia actual entre tu destino y tu es menor a tu distancia de alarma. No necesitas esto ahora, selecciona un lugar más lejano en el mapa.</string>
+    <string name="distance_format">Estás a %1$s de tu destino.</string>
+    <string name="service_running">Servicio de rastreo en ejecución</string>
+    <string name="calc_distance">Calculando distancia&#8230;</string>
+    <string name="enter_distance">Introduce distancia en metros</string>
+    <string name="distance_tag">Configurar distancia de alarma</string>
+    <string name="distance_title">Distancia de alarma</string>
+    <string name="mts_custom">Distancia personalizada.</string>
+    <string name="min_distance_alert">La distancia mínima es de 100 mts.</string>
+    <string name="max_distance_alert">La distancia máxima es de 2000 mts.</string>
+    <string name="field_required">Este campo es requerido.</string>
 </resources>

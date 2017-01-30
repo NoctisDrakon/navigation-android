@@ -12,28 +12,44 @@
         android:layout_height="match_parent"
         android:apiKey="@string/google_android_map_api_key" />
 
-    <TextView
-        android:id="@+id/text_data"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="15dp"
-        android:background="@android:color/holo_orange_dark"
-        android:padding="5dp"
-        android:textColor="@android:color/white"
-        android:textStyle="bold"
-        android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/distance"
+    <android.support.v7.widget.CardView xmlns:card_view="http://schemas.android.com/apk/res-auto"
+        android:id="@+id/card_info"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
+        android:layout_gravity="center"
         android:layout_margin="15dp"
-        android:background="@android:color/holo_blue_dark"
-        android:padding="5dp"
-        android:textColor="@android:color/white"
-        android:textStyle="bold"
-        android:visibility="gone" />
+        android:elevation="5dp"
+        android:visibility="gone"
+        card_view:cardCornerRadius="4dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.github.lzyzsd.circleprogress.DonutProgress xmlns:custom="http://schemas.android.com/apk/res-auto"
+                android:id="@+id/donut_progress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                custom:donut_finished_color="@color/colorAccent"
+                custom:donut_progress="45"
+                custom:donut_unfinished_color="@color/colorPrimary" />
+
+            <TextView
+                android:id="@+id/distance"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_margin="15dp"
+                android:layout_weight="70"
+                android:gravity="center"
+                android:padding="5dp"
+                android:textColor="@color/colorPrimary" />
+
+        </LinearLayout>
+
+
+    </android.support.v7.widget.CardView>
 
     <LinearLayout
         android:id="@+id/wait_layout"
